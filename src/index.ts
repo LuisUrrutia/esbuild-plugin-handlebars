@@ -1,6 +1,7 @@
 import handlebars from "handlebars";
 import { PluginBuild, OnLoadOptions } from "esbuild";
 import { stat, readFile } from "fs/promises";
+import { minify } from "html-minifier-terser";
 
 let foundHelpers: string[] = [];
 const fileCache = new Map();
@@ -23,8 +24,16 @@ const onloadOpt: OnLoadOptions = {
   filter: /\.(hbs|handlebars)$/i,
 };
 
-function hbs(options: { additionalHelpers: any; additionalPartials: any; precompileOptions: any } = { additionalHelpers: {}, additionalPartials: {}, precompileOptions: {} }) {
-  const { additionalHelpers = {}, additionalPartials = {}, precompileOptions = {} } = options;
+type HBSOptions = {
+  additionalHelpers?: any;
+  additionalPartials?: any;
+  precompileOptions?: any;
+  minifyOutput?: boolean;
+  minifyOptions?: any;
+};
+
+function hbs(options: HBSOptions = {}) {
+  const { additionalHelpers = {}, additionalPartials = {}, precompileOptions = {}, minifyOutput = false, minifyOptions = {} } = options;
   return {
     name: "handlebars",
     setup(build: PluginBuild) {
@@ -69,7 +78,14 @@ function hbs(options: { additionalHelpers: any; additionalPartials: any; precomp
 
         try {
           foundHelpers = [];
-          const template = hb.precompile(source, compileOptions);
+          let template = hb.precompile(source, compileOptions);
+          if (minifyOutput) {
+            template = minify(template, {
+              continueOnParseError: true,
+              ...minifyOptions,
+            })
+          }
+
           const foundAndMatchedHelpers = foundHelpers.filter((helper) => additionalHelpers[helper] !== undefined);
           const contents = [
             "import * as Handlebars from 'handlebars/runtime';",
@@ -79,6 +95,7 @@ function hbs(options: { additionalHelpers: any; additionalPartials: any; precomp
             `Handlebars.registerPartial({${Object.keys(additionalPartials).join()}});`,
             `export default Handlebars.template(${template});`,
           ].join("\n");
+
           return { contents };
         } catch (err: any) {
           const esBuildError = { text: err.message };
