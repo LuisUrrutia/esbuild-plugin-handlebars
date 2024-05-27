@@ -1,7 +1,6 @@
 import handlebars from "handlebars";
 import { PluginBuild, OnLoadOptions } from "esbuild";
 import { stat, readFile } from "fs/promises";
-import { minify } from "html-minifier-terser";
 
 let foundHelpers: string[] = [];
 const fileCache = new Map();
@@ -80,6 +79,7 @@ function hbs(options: HBSOptions = {}) {
           foundHelpers = [];
           let template = hb.precompile(source, compileOptions);
           if (minifyOutput) {
+            const { minify } = await import("html-minifier-terser")
             template = minify(template, {
               continueOnParseError: true,
               ...minifyOptions,
